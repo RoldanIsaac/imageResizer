@@ -1,106 +1,40 @@
-const form = document.querySelector('#img-form');
-const img = document.querySelector('#img');
-
+const form = document.querySelector('#yt-form');
+const urlInput = document.querySelector('#url');
 const outputPath = document.querySelector('#output-path');
-const filename = document.querySelector('#filename');
-
-const heightInput = document.querySelector('#height');
-const widthInput = document.querySelector('#width');
-
 const btn = document.querySelector('#btn');
 
-btn.addEventListener('click', () => {
-   console.log('Im working');
-   electron.runPythonScript()
-})
+// btn.addEventListener('click', () => {
+//    const url = urlInput.value;
+//    console.log(url)
+//    electron.runPythonScript(url)
+// });
 
-img.addEventListener('change', loadImage);
-form.addEventListener('submit', sendImage);
+form.addEventListener('submit', sendUrl);
 
 // ---------------------------------------------------------------------------------------
-// @ Image methods
+// @ Public methods
 // ---------------------------------------------------------------------------------------
 
-// Validation : Make sure file is image
-function isFileImage(file) {
-   const acceptedImageTypes = ['image/gif', 'image/png', 'image/jpeg', 'image/jpg'];
-   return file && acceptedImageTypes.includes(file['type']);
-}
-
-// Load Image 
-function loadImage(e) {
-   const file = e.target.files[0];
-
-   if (!isFileImage(file)) {
-      alert('Please select an image', 'red')
-      return;
-   }
-
-   alert('success', 'green');
-
-   getOriginalDimensions(file);
-
-   console.log(file)
-
-   form.style.display = 'block';
-   filename.innerText = file.name;
-}
-
-function getOriginalDimensions(file) {
-   console.log('getOriginalDimensions()')
-
-   const image = new Image();
-   image.src = URL.createObjectURL(file);
-   image.onload = function () {
-      widthInput.value = this.width;
-      heightInput.value = this.height;
-   }
-
-   filename.innerText = file.name;
-   // outputPath.innerText = path.join(os.homedir(), 'imageresizer');
-}
-
-function sendImage(e) {
+function sendUrl(e) {
    e.preventDefault();
-
-   const width = widthInput.value;
-   const height = heightInput.value;
-
-   // deprecated
-   // const imgPath = img.files[0].path; 
-   // console.log(img.files[0].path)
-   const imgPath = electron.showFilePath(img.files[0])
-
-   console.log('Path:')
-   console.log(electron.showFilePath(img.files[0]))
-
-   console.log(
-      versions.node(),
-      versions.chrome(),
-      versions.electron()
-   )
-   
-   if (!img.files[0]) {
-      alert('Please upload an image', 'red');
-   }
-
-   if (width === '' || height == '') {
-      alert('Pleas fill in a heigth and width');
-   }
-
+   const url = urlInput.value;
+   console.log(url)
    // (Inter-Process Communication).
    // Send to main using ipcRenderer
-   ipcRenderer.send('image:resize', {
-      imgPath, 
-      width,
-      height
+   ipcRenderer.send('url:download', {
+      url,
    })
 }
 
-ipcRenderer.on('image:done', () => {
-   alert(`image resized to ${widthInput.value} x ${heightInput.value}`, 'green');
+ipcRenderer.on('download:done', () => {
+   alert(`Video downloaded successfully! Seize time!`, 'green');
 })
 
+ipcRenderer.on('download:progress', (percentage) => {
+   console.log(percentage);
+   document.getElementById('progressText').innerText = `${percentage}%`;
+   document.getElementById('bar').style.width = `${percentage}%`;
+})
 
 // ---------------------------------------------------------------------------------------
 // @ Alert
@@ -118,3 +52,34 @@ function alert(message, color) {
       }
    })
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const os = require('os');
 const fs = require('fs');
 const path = require('path');
@@ -31,20 +32,13 @@ const createMainWindow = () => {
    // mainWindow.loadFile(path.join(__dirname), './renderer/index.html');
    mainWindow.loadFile('renderer/index.html');
 
-   // runPythonScript();
-
-   ipcMain.on('run-script-py', (event) => {
-      runPythonScript(event)
+   // Respond to ipcRenderer url download
+   ipcMain.on('url:download', (event, options) => {
+      // console.log(options)
+      options.dest = path.join(os.homedir(), 'youtube_downloaded_videos');
+      downloadVideo(options);
    })
 
-   // Respond to ipcRenderer rezise
-   ipcMain.on('image:resize', (e, options) => {
-      options.dest = path.join(os.homedir(), 'imageresizer');
-      resizeImage(options);
-      console.log(options)
-   })
-
-   
 }
 
 const creatAboutWindow = () => {
@@ -120,51 +114,79 @@ app.on('window-all-closed', () => {
 // @ Extra methods
 // ---------------------------------------------------------------------------------------
 
-async function resizeImage({ imgPath, width, height, dest }) {
+function downloadVideo(options) {
+   console.log(options)
    try {
-      const newPath = await resizeImg(fs.readFileSync(imgPath), {
-         width: +width,
-         height: +height,
-      })  
 
-      const filename = path.basename(imgPath);
+      const pyScriptPath = path.join(__dirname, 'script.py');
+      const url = encodeURIComponent(options.url); 
 
-      // Create dest folder
-      if (!fs.existsSync(dest)) {
-         fs.mkdirSync(dest)
-      }
+      const pythonProcess = spawn('python', [pyScriptPath, url]);
 
-      console.log(1)
+      pythonProcess.stdout.on('data', (data) => {
+         console.log(`stdout: ${data}`);
 
-      // write file to destination folder
-      fs.writeFileSync(path.join(dest, filename), newPath); 
+         // / Convert the Buffer to a string
+         const output = data.toString();
+         
+         console.log(`stdout: ${output}`);
 
-      // Send success to render
-      mainWindow.webContents.send('image:done');
+         // Usamos una expresión regular para buscar el porcentaje de descarga
+         const match = output.match(/\[download\]\s*([\d.]+)%/);
+         if (match) {
+            const percentage = match[1];
+            console.log(`Progress: ${percentage}%`);
 
-      // Open dest folder
-      shell.openPath(dest)
+            // Send the percentage to the renderer process
+            mainWindow.webContents.send('download:progress', percentage);
+            // mainWindow.webContents.send('download:done', percentage);
+         }
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+      console.error(`stderr: ${data}`);
+      });
+
+      pythonProcess.on('close', (code) => {
+      console.log(`El proceso Python terminó con el código ${code}`);
+      });
       
+      
+      // console.log(url)
+      // exec(`python "${pyScriptPath}" "${url}"`, (error, stdout, stderr) => {
+      //    console.log('Ejecutando script...'); 
+
+      //    if (error) {
+      //       console.error(`Error on executing python script: ${error}`);
+      //       return;
+      //    }
+
+      //    if (stdout) {
+      //       console.log(`stdout: ${stdout}`);
+      //    }
+
+      //    if (stderr) {
+      //       console.log(`stderr: ${stderr}`)
+      //    }
+
+      //    // // Verificamos si el script indicó que la descarga fue exitosa
+      //    // if (stdout.includes('Download complete')) {
+      //    //    // Notificamos que la descarga terminó correctamente
+      //    //    event.reply('download-completed', 'El video se descargó correctamente');
+
+      //    //    // Send success to render
+      //    //    mainWindow.webContents.send('download:done');
+
+      //    //    // Open dest folder
+      //    //    // shell.openPath(dest)
+
+      //    // } else {
+      //    //    // Notificamos si hubo un error
+      //    //    event.reply('download-failed', 'Hubo un problema con la descarga');
+      //    // }
+      // })
+
    } catch (error) {
-      console.log(2)
-      console.log(error);
+      console.log('Error en el try-catch:', error);
    }
-}
-
-function runPythonScript(event) {
-   const pyScriptPath = path.join(__dirname, 'script.py');
-
-   exec(`python "${pyScriptPath}"`, (error, stdout, stderr) => {
-      if (error) {
-         console.error(`Error al ejecutar el script de python: ${error}`);
-         return;
-      }
-
-      if (stderr) {
-         console.log(`stderr: ${stderr}`)
-      }
-
-      console.log(`stdout: ${stdout}`)
-      event.reply('pyhton-script-result', stdout);
-   })
 }
